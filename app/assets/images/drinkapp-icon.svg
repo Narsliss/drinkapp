@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32">
+  <defs>
+    <linearGradient id="glassGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b4a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d54215;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Cocktail glass stem and base -->
+  <path d="M45 40 L45 75 L35 85 L65 85 L55 75 L55 40" fill="none" stroke="url(#glassGradient)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Cocktail glass bowl -->
+  <path d="M30 25 L35 40 L65 40 L70 25 Z" fill="url(#glassGradient)" opacity="0.9"/>
+  <!-- Liquid inside -->
+  <path d="M32 30 L35 38 L65 38 L68 30 Z" fill="#fff5f0" opacity="0.3"/>
+  <!-- Garnish (lemon/lime wedge) -->
+  <circle cx="72" cy="22" r="6" fill="#8bc34a" stroke="#689f38" stroke-width="1"/>
+  <path d="M72 22 L76 18" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Small bubbles -->
+  <circle cx="45" cy="32" r="2" fill="#fff" opacity="0.6"/>
+  <circle cx="55" cy="28" r="1.5" fill="#fff" opacity="0.5"/>
+  <circle cx="50" cy="34" r="1" fill="#fff" opacity="0.4"/>
+</svg>

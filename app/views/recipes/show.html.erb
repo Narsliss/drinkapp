@@ -1,0 +1,205 @@
+<article class="recipe-detail">
+  <%= link_to "← Back to Cocktails", root_path, class: "back-link" %>
+
+  <header class="recipe-header">
+    <h1><%= @recipe.name %></h1>
+    
+    <div class="meta">
+      <% rating = @recipe.average_rating %>
+      <% if rating > 0 %>
+        <span style="color: #ff9800;">★ <%= rating %>/5</span>
+        · <%= @recipe.ratings.count %> reviews
+      <% end %>
+      
+      <% if @recipe.glass.present? %>
+        · <%= @recipe.glass %>
+      <% end %>
+      
+      · Source: <%= recipe_source_name(@recipe) %>
+    </div>
+  </header>
+
+  <% if @recipe.image_url.present? %>
+    <img src="<%= @recipe.image_url %>" alt="<%= @recipe.name %>" class="recipe-detail-image">
+  <% end %>
+
+  <% if @recipe.description.present? %>
+    <p style="font-size: 18px; color: #555; margin-bottom: 30px;"><%= @recipe.description %></p>
+  <% end %>
+
+  <div class="recipe-columns">
+    <div class="column">
+      <h2>Ingredients</h2>
+      
+      <div class="serving-selector" style="margin-bottom: 15px;">
+        <label for="serving-size">Scale:</label>
+        <select id="serving-size" onchange="scaleRecipe(this.value)">
+          <option value="0.25">¼×</option>
+          <option value="0.5">½×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.5">1½×</option>
+          <option value="2">2×</option>
+          <option value="3">3×</option>
+        </select>
+      </div>
+      
+      <ul class="ingredient-list" id="ingredient-list">
+        <% @recipe.recipe_ingredients.includes(:ingredient).each do |ri| %>
+          <li class="ingredient-item" data-original-amount="<%= ri.amount %>">
+            <strong><%= ri.ingredient.name %></strong>
+            <% if ri.amount.present? %>
+              — <span class="scaled-amount"><%= convert_measurement(ri.amount) %></span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+
+    <div class="column">
+      <h2>Directions</h2>
+      
+      <div class="instructions">
+        <% @recipe.instructions.to_s.split("\n").reject(&:blank?).each_with_index do |step, index| %>
+          <p><strong>Step <%= index + 1 %>:</strong> <%= step.strip %></p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <% if @recipe.source_url.present? %>
+    <p style="margin-top: 30px;">
+      <%= link_to "View Original Recipe →", @recipe.source_url, target: "_blank", style: "color: #d54215;" %>
+    </p>
+  <% end %>
+
+  <div class="rating-section">
+    <h3>Rate This Recipe</h3>
+    
+    <%= form_with model: [@recipe, @rating] do |f| %>
+      <div class="star-rating" style="direction: rtl; display: inline-block;">
+        <% (1..5).reverse_each do |score| %>
+          <%= f.radio_button :score, score, id: "star#{score}" %>
+          <%= label_tag "star#{score}", "★", style: "display: inline-block;" %>
+        <% end %>
+      </div>
+      
+      <br>
+      <%= f.submit "Submit Rating", class: "submit-btn" %>
+    <% end %>
+  </div>
+
+  <div class="notes-section">
+    <h3>My Notes</h3>
+    
+    <% if @note.persisted? %>
+      <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+        <p><%= @note.content %></p>
+      </div>
+      
+      <%= form_with model: [@recipe, @note] do |f| %>
+        <%= f.text_area :content, rows: 4, placeholder: "Update your notes..." %>
+        <br>
+        <%= f.submit "Update Note", class: "submit-btn" %>
+      <% end %>
+    <% else %>
+      <%= form_with model: [@recipe, @note] do |f| %>
+        <%= f.text_area :content, rows: 4, placeholder: "Add your personal notes about this cocktail..." %>
+        <br>
+        <%= f.submit "Save Note", class: "submit-btn" %>
+      <% end %>
+    <% end %>
+  </div>
+</article>
+
+<script>
+function scaleRecipe(multiplier) {
+  const items = document.querySelectorAll('.ingredient-item');
+  
+  items.forEach(item => {
+    const originalAmount = item.getAttribute('data-original-amount');
+    const displayElement = item.querySelector('.scaled-amount');
+    
+    if (originalAmount && displayElement) {
+      const scaled = scaleAmount(originalAmount, parseFloat(multiplier));
+      displayElement.textContent = scaled;
+    }
+  });
+}
+
+function scaleAmount(amountStr, multiplier) {
+  // Parse the original amount
+  let value, unit;
+  
+  // Handle fractions like "1/2", "3/4"
+  if (amountStr.match(/^\d+\/\d+\s*(oz|ml)?/i)) {
+    const fracMatch = amountStr.match(/^(\d+)\/(\d+)\s*(.*)$/);
+    if (fracMatch) {
+      value = parseInt(fracMatch[1]) / parseInt(fracMatch[2]);
+      unit = fracMatch[3].trim();
+    }
+  }
+  // Handle mixed numbers like "1 1/2"
+  else if (amountStr.match(/^\d+\s+\d+\/\d+/)) {
+    const mixedMatch = amountStr.match(/^(\d+)\s+(\d+)\/(\d+)\s*(.*)$/);
+    if (mixedMatch) {
+      value = parseInt(mixedMatch[1]) + (parseInt(mixedMatch[2]) / parseInt(mixedMatch[3]));
+      unit = mixedMatch[4].trim();
+    }
+  }
+  // Handle decimal numbers with units like "1.5 oz", "2 ml"
+  else {
+    const decimalMatch = amountStr.match(/^(\d+\.?\d*)\s*(.*)$/);
+    if (decimalMatch) {
+      value = parseFloat(decimalMatch[1]);
+      unit = decimalMatch[2].trim();
+    }
+  }
+  
+  if (!value) return amountStr;
+  
+  const scaledValue = value * multiplier;
+  unit = unit.toLowerCase();
+  
+  // For oz and ml, show both measurements
+  if (unit.match(/^oz\.?$/i) || unit.match(/^ounces?$/i)) {
+    const mlValue = Math.round(scaledValue * 29.5735);
+    return formatNumber(scaledValue) + ' oz (' + mlValue + ' ml)';
+  }
+  else if (unit.match(/^mls?$/i) || unit.match(/^milliliters?$/i)) {
+    const ozValue = scaledValue / 29.5735;
+    const ozDisplay = Math.abs(ozValue - Math.round(ozValue)) < 0.01 ? Math.round(ozValue) : Math.round(ozValue * 100) / 100;
+    return formatNumber(scaledValue) + ' ml (' + ozDisplay + ' oz)';
+  }
+  else {
+    // For other units (dash, splash, etc.), just return scaled value
+    return formatNumber(scaledValue) + (unit ? ' ' + unit : '');
+  }
+}
+
+function formatNumber(num) {
+  // Convert to fraction for common values
+  const tolerance = 0.01;
+  const fractions = [
+    [0.25, '¼'], [0.5, '½'], [0.75, '¾'],
+    [0.33, '⅓'], [0.67, '⅔'],
+    [1.5, '1½'], [2.5, '2½']
+  ];
+  
+  const decimal = num % 1;
+  const whole = Math.floor(num);
+  
+  for (const [val, frac] of fractions) {
+    if (Math.abs(decimal - val) < tolerance) {
+      return whole > 0 ? whole + frac : frac;
+    }
+  }
+  
+  // Round to 2 decimal places if needed
+  return Math.round(num * 100) / 100;
+}
+
+// Initialize with 1x scale on page load
+document.addEventListener('DOMContentLoaded', function() {
+  scaleRecipe(1);
+});
+</script>

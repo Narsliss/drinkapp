@@ -1,0 +1,243 @@
+<section class="hero">
+  <h1>Find Your Perfect Cocktail</h1>
+  <p>Browse <strong style="color: #d54215;"><%= @recipes.count %></strong> recipes and discover your new favorite drink.</p>
+</section>
+
+<section class="filters">
+  <%= form_with url: recipes_path, method: :get, id: 'filter-form' do %>
+    <% if params[:search].present? %>
+      <%= hidden_field_tag :search, params[:search] %>
+    <% end %>
+    
+    <!-- Active Filters Summary (Always Visible) -->
+    <% selected_cats = @categories.select { |c| params[:category_ids]&.include?(c.id.to_s) } %>
+    <% has_filters = selected_cats.any? || params[:source].present? || params[:min_rating].present? %>
+    
+    <div class="filters-header">
+      <button type="button" class="filters-toggle" onclick="toggleFilters()">
+        <span class="toggle-text">Filters</span>
+        <span class="toggle-arrow" id="filters-arrow">&#9660;</span>
+      </button>
+      
+      <% if has_filters %>
+        <div class="active-filters-summary">
+          <% selected_cats.first(3).each do |cat| %>
+            <span class="mini-pill"><%= cat.name %></span>
+          <% end %>
+          <% if selected_cats.count > 3 %>
+            <span class="mini-pill">+<%= selected_cats.count - 3 %> more</span>
+          <% end %>
+          <% if params[:source].present? %>
+            <% source_name = @sources.find { |s| s[1] == params[:source] }&.first || params[:source] %>
+            <span class="mini-pill"><%= source_name %></span>
+          <% end %>
+          <% if params[:min_rating].present? %>
+            <span class="mini-pill"><%= params[:min_rating] %>+★</span>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+    
+    <!-- Collapsible Filter Content -->
+    <div id="filters-content" class="filters-content">
+      <!-- Selected Filters Pills (Clear Buttons) -->
+      <% if has_filters %>
+        <div class="selected-filters">
+          <span class="selected-label">Active filters:</span>
+          <% selected_cats.each do |cat| %>
+            <span class="filter-pill active" onclick="removeCategory(<%= cat.id %>)">
+              <%= cat.name %> <span class="remove">&times;</span>
+            </span>
+          <% end %>
+          <% if params[:source].present? %>
+            <% source_name = @sources.find { |s| s[1] == params[:source] }&.first || params[:source] %>
+            <span class="filter-pill active" onclick="removeFilter('source')">
+              Source: <%= source_name %> <span class="remove">&times;</span>
+            </span>
+          <% end %>
+          
+          <% if params[:min_rating].present? %>
+            <span class="filter-pill active" onclick="removeFilter('min_rating')">
+              <%= params[:min_rating] %>+ Stars <span class="remove">&times;</span>
+            </span>
+          <% end %>
+          
+          <%= link_to "Clear all", recipes_path(search: params[:search]), class: "clear-link" %>
+        </div>
+      <% end %>
+      
+      <!-- Filter Grid -->
+      <div class="filter-grid">
+        <% @grouped_categories.each do |group_name, categories| %>
+          <% next if categories.empty? %>
+          
+          <div class="filter-group">
+            <h3 class="group-title" onclick="toggleGroup(this)">
+              <span class="toggle-icon">&#9656;</span>
+              <%= group_name %>
+              <span class="group-count"><%= categories.sum { |c| c.ingredients.count } %></span>
+            </h3>
+            
+            <div class="group-content collapsed">
+              <div class="category-tags">
+                <% categories.each do |category| %>
+                  <% next if category.ingredients.count == 0 %>
+                  <% is_selected = params[:category_ids]&.include?(category.id.to_s) %>
+                  
+                  <label class="category-tag <%= 'selected' if is_selected %>">
+                    <%= check_box_tag "category_ids[]", category.id, is_selected, 
+                        id: "cat_#{category.id}", 
+                        class: 'hidden-checkbox',
+                        onchange: 'this.form.submit()' %>
+                    <span class="tag-name"><%= category.name %></span>
+                    <span class="tag-count"><%= category.ingredients.count %></span>
+                  </label>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+      
+      <!-- Additional Filters Row -->
+      <div class="additional-filters">
+        <div class="filter-field">
+          <label for="source">Source</label>
+          <%= select_tag :source, 
+              options_for_select([['All', '']] + @sources, params[:source]),
+              class: 'filter-select',
+              onchange: "this.form.submit()" %>
+        </div>
+        
+        <div class="filter-field">
+          <label for="min_rating">Min Rating</label>
+          <%= select_tag :min_rating,
+              options_for_select([
+                ['Any', ''],
+                ['1★+', '1'],
+                ['2★+', '2'],
+                ['3★+', '3'],
+                ['4★+', '4'],
+                ['5★', '5']
+              ], params[:min_rating]),
+              class: 'filter-select',
+              onchange: "this.form.submit()" %>
+        </div>
+      </div>
+    </div>
+    
+    <%= submit_tag "", style: "display: none;" %>
+  <% end %>
+</section>
+
+<section class="recipes-section">
+  <div class="section-header">
+    <h2><%= params[:search].present? || params[:category_ids].present? ? "Search Results" : "Popular Cocktails" %></h2>
+    <span class="recipe-count"><%= @recipes.count %> recipes</span>
+  </div>
+
+  <% if @recipes.any? %>
+    <div class="recipe-grid">
+      <% @recipes.each do |recipe| %>
+        <% rating = recipe.average_rating %>
+        
+        <article class="recipe-card">
+          <%= link_to recipe_path(recipe) do %>
+            <div class="recipe-image">
+              <% if recipe.image_url.present? %>
+                <img src="<%= recipe.image_url %>" alt="<%= recipe.name %>" loading="lazy">
+              <% else %>
+                <span class="recipe-placeholder">🍸</span>
+              <% end %>
+            </div>
+            
+            <div class="recipe-content">
+              <h3 class="recipe-title"><%= recipe.name %></h3>
+              
+              <p class="recipe-meta">
+                <%= recipe.ingredients.count %> ingredients
+                <% if recipe.glass.present? %>
+                  · <%= recipe.glass %>
+                <% end %>
+                <br><small style="color: #999;">Source: <%= recipe_source_name(recipe) %></small>
+              </p>
+              
+              <% if rating > 0 %>
+                <div class="rating-badge">
+                  <span class="star">★</span>
+                  <span><%= rating %></span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </article>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="empty-state">
+      <div class="empty-state-icon">🍹</div>
+      <h3>No cocktails found</h3>
+      <p>Try adjusting your search or filters.</p>
+      <%= link_to "View All Cocktails", recipes_path, class: "btn" %>
+    </div>
+  <% end %>
+</section>
+
+<script>
+  // Toggle main filters accordion
+  function toggleFilters() {
+    const content = document.getElementById('filters-content');
+    const arrow = document.getElementById('filters-arrow');
+    content.classList.toggle('collapsed');
+    arrow.style.transform = content.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(0deg)';
+    
+    // Save state to localStorage
+    localStorage.setItem('filtersCollapsed', content.classList.contains('collapsed'));
+  }
+  
+  function toggleGroup(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('collapsed');
+    icon.style.transform = content.classList.contains('collapsed') ? 'rotate(0deg)' : 'rotate(90deg)';
+  }
+  
+  function removeCategory(categoryId) {
+    const checkbox = document.getElementById('cat_' + categoryId);
+    if (checkbox) {
+      checkbox.checked = false;
+      checkbox.form.submit();
+    }
+  }
+  
+  function removeFilter(filterName) {
+    const select = document.querySelector('[name="' + filterName + '"]');
+    if (select) {
+      select.value = '';
+      select.form.submit();
+    }
+  }
+  
+  // Initialize on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    // Restore accordion state (default to collapsed if filters are selected)
+    const content = document.getElementById('filters-content');
+    const hasFilters = document.querySelectorAll('.filter-pill.active').length > 0;
+    const wasCollapsed = localStorage.getItem('filtersCollapsed');
+    
+    if (wasCollapsed === 'true' || (hasFilters && wasCollapsed !== 'false')) {
+      content.classList.add('collapsed');
+      document.getElementById('filters-arrow').style.transform = 'rotate(-90deg)';
+    }
+    
+    // Expand groups that have selected items
+    document.querySelectorAll('.category-tag.selected').forEach(function(tag) {
+      const groupContent = tag.closest('.group-content');
+      if (groupContent) {
+        groupContent.classList.remove('collapsed');
+        const icon = groupContent.previousElementSibling.querySelector('.toggle-icon');
+        if (icon) icon.style.transform = 'rotate(90deg)';
+      }
+    });
+  });
+</script>
